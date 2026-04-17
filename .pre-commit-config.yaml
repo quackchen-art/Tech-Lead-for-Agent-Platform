@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      # 步驟一：RULES.md 有改動時，自動重新產生 copilot-instructions.md
+      - id: sync-copilot-instructions
+        name: 同步 copilot-instructions.md
+        entry: python scripts/generate_copilot_instructions.py
+        language: python
+        files: ^RULES\.md$
+        pass_filenames: false
+
+      # 步驟二：掃描本次異動的 .cs 檔案
+      - id: check-rules
+        name: 聯合通商規範檢查
+        entry: python scripts/check_rules.py
+        language: python
+        files: \.cs$
+        pass_filenames: false
