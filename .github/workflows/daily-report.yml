@@ -1,0 +1,59 @@
+name: 每日品質報告
+
+on:
+  schedule:
+    # 每天早上 08:00 台灣時間（UTC 00:00）
+    - cron: '0 0 * * 1-5'
+  workflow_dispatch:  # 也可以手動觸發
+
+jobs:
+  quality-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 下載程式碼
+        uses: actions/checkout@v4
+
+      - name: 安裝 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 跑全專案規範掃描
+        run: |
+          python scripts/check_rules.py --all > report.txt 2>&1 || true
+          cat report.txt
+
+      - name: 統計違規數量
+        id: stats
+        run: |
+          HARD=$(grep -c "HARD RULE" report.txt || echo 0)
+          SOFT=$(grep -c "SOFT RULE" report.txt || echo 0)
+          PEND=$(grep -c "待審例外" report.txt || echo 0)
+          echo "hard=$HARD" >> $GITHUB_OUTPUT
+          echo "soft=$SOFT" >> $GITHUB_OUTPUT
+          echo "pending=$PEND" >> $GITHUB_OUTPUT
+          echo "date=$(date '+%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: 寄送品質報告 Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "📊 聯合通商品質日報 | ${{ steps.stats.outputs.date }} | HARD: ${{ steps.stats.outputs.hard }} SOFT: ${{ steps.stats.outputs.soft }}"
+          to: caspar@example.com
+          from: 品質報告機器人
+          body: |
+            聯合通商品質日報 - ${{ steps.stats.outputs.date }}
+
+            HARD 違規：${{ steps.stats.outputs.hard }} 筆
+            SOFT 警告：${{ steps.stats.outputs.soft }} 筆
+            待審例外：${{ steps.stats.outputs.pending }} 筆
+
+            詳細報告請至 GitHub Actions 查看：
+            ${{ github.server_url }}/${{ github.repository }}/actions
+
+            --- 完整掃描結果 ---
+            （請查看 Actions 頁面的完整 log）
